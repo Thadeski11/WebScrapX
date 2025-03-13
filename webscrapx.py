@@ -53,27 +53,32 @@ def Scrap(html):
 
 	return verificar_emails, verificar_telefones
 
-def Check_Url_Only(wordlist):
+def Check_Url_Only(url):
 	session = HTMLSession()
 	req = session.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"})
 
 	html = req.text
 	emails, telefones = Scrap(html)
-	
-	if len(emails) >= 1:
-		print("EMAILS")
-		print(emails)
-	if len(telefones) >= 1:
-		print("TELEFONES")
-		print(telefones)
+
+	if len(emails) == 0 and len(telefones) == 0:
+		print(f"{url} ❌❌❌")
+	else:
+		print(f"{url} ⬇️ ⬇️ ⬇️")
+		if len(emails) >= 1:
+			print("			EMAILS:")
+			print(f"				{emails}")
+		if len(telefones) >= 1:
+			print("			TELEFONES:")
+			print(f"				{telefones}")
+
 	
 
 def Check_Urls_Wordlist(urls_wordlist):
 	session = HTMLSession()
 	with open(urls_wordlist, "r") as w:
-		for linhas in w:
-			linhas = linhas.strip()
-			req = session.get(linhas, headers={"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"})
+		for urls in w:
+			urls = urls.strip()
+			req = session.get(urls, headers={"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"})
 
 			html = req.text
 			emails, telefones = Scrap(html)
