@@ -1,10 +1,13 @@
 import argparse
 from requests_html import HTMLSession
 import re
+import aiohttp
+import asyncio
 
 parser = argparse.ArgumentParser(prog="WebScrapX", description="Script de Scraping.")
 parser.add_argument("-u", "--url", help="Passar a url alvo (Recomenda-se o uso de ' ').")
 parser.add_argument("-ul", "--ulist", help="Passar a wordlist com as urls.")
+parser.add_argument("-t", "--time", help="Máximo de Requisições por segundo")
 args = parser.parse_args()
 
 
@@ -13,7 +16,7 @@ def Scrap(html):
 	telef_SA = r"\+?\d{0,3}?\s?\(\d{1,2}\)\s?\d{4,5}\s?-?\.?_?\d{4,5}"
 	telef_NA = r"\+?\d{0,3}?\s?\(\d{3}\)\s?\d{3}\s?\.?-?_?\d{4}"
 	telef_EU = r"\+?\d{0,3}?\s\d{1,3}\s\d{2,3}\s\d{2,3}\s\d{2,3}\s\d{2,3}" 
-	open_Num = r"\d{3,4}\s-?\d{3}\s-?\d{3,4}"
+	open_Num = r"\d{3,4}\s\d{3}\s\d{3,4}"
 
 	emails = re.findall(email_all, html)
 	telefones_SouthAmerica = re.findall(telef_SA, html)
@@ -71,30 +74,50 @@ def Check_Url_Only(url):
 			print("			TELEFONES:")
 			print(f"				{telefones}")
 
-	
 
-def Check_Urls_Wordlist(urls_wordlist):
-	session = HTMLSession()
+max_req_per_second = args.time
+semaphore = asyncio.Semaphore(int(max_req_per_second))
+
+async def Busca_Asy(session, url):
+	async with semaphore:
+		try:
+			async with session.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}) as req:
+				html = await req.text()
+				return url, html
+		except Exception:
+			print(f"Erro ao buscar {url}")
+			return url, None
+
+async def Check_Urls_Wordlist(urls_wordlist):
+	urls = []
 	with open(urls_wordlist, "r") as w:
-		for urls in w:
-			urls = urls.strip()
-			req = session.get(urls, headers={"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"})
+		for url in w.readlines():
+			url = url.strip()
+			urls.append(url)
 
-			html = req.text
+	async with aiohttp.ClientSession() as session:
+		tarefas = [Busca_Asy(session, url) for url in urls]
+		resultados = await asyncio.gather(*tarefas)
+	
+	for url, html in resultados:
+		if html:
 			emails, telefones = Scrap(html)
-			
+
 			if len(emails) == 0 and len(telefones) == 0:
-				print(f"{linhas} ❌❌❌")
+				print(f"{url} ❌❌❌")
 			else:
-				print(f"{linhas} ⬇️ ⬇️ ⬇️")
+				print(f"{url} ⬇️ ⬇️ ⬇️")
 				if len(emails) >= 1:
 					print("			EMAILS:")
-					print(f"				{emails}")
+					for item in emails:
+						print(f"				{item}")
 				if len(telefones) >= 1:
 					print("			TELEFONES:")
-					print(f"				{telefones}")
+					for item in telefones:
+						print(f"				{item}")
+
 
 if args.url:
 	Check_Url_Only(args.url)
 elif args.ulist:
-	Check_Urls_Wordlist(args.ulist)
+	asyncio.run(Check_Urls_Wordlist(args.ulist))
