@@ -7,7 +7,7 @@ import asyncio
 parser = argparse.ArgumentParser(prog="WebScrapX", description="Script de Scraping.")
 parser.add_argument("-u", "--url", help="Passar a url alvo (Recomenda-se o uso de ' ').")
 parser.add_argument("-ul", "--ulist", help="Passar a wordlist com as urls.")
-parser.add_argument("-t", "--time", help="Máximo de Requisições por segundo")
+parser.add_argument("-t", "--time", type=int, default=1, help="Máximo de Requisições por segundo")
 args = parser.parse_args()
 
 
@@ -75,10 +75,7 @@ def Check_Url_Only(url):
 			print(f"				{telefones}")
 
 
-max_req_per_second = args.time
-semaphore = asyncio.Semaphore(int(max_req_per_second))
-
-async def Busca_Asy(session, url):
+async def Busca_Asy(session, url, semaphore):
 	async with semaphore:
 		try:
 			async with session.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}) as req:
@@ -88,7 +85,8 @@ async def Busca_Asy(session, url):
 			print(f"Erro ao buscar {url}")
 			return url, None
 
-async def Check_Urls_Wordlist(urls_wordlist):
+async def Check_Urls_Wordlist(urls_wordlist, semaphore):
+	semaphore = asyncio.Semaphore(semaphore)
 	urls = []
 	with open(urls_wordlist, "r") as w:
 		for url in w.readlines():
@@ -96,7 +94,7 @@ async def Check_Urls_Wordlist(urls_wordlist):
 			urls.append(url)
 
 	async with aiohttp.ClientSession() as session:
-		tarefas = [Busca_Asy(session, url) for url in urls]
+		tarefas = [Busca_Asy(session, url, semaphore) for url in urls]
 		resultados = await asyncio.gather(*tarefas)
 	
 	for url, html in resultados:
@@ -120,4 +118,4 @@ async def Check_Urls_Wordlist(urls_wordlist):
 if args.url:
 	Check_Url_Only(args.url)
 elif args.ulist:
-	asyncio.run(Check_Urls_Wordlist(args.ulist))
+	asyncio.run(Check_Urls_Wordlist(args.ulist, args.time))
